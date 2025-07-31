@@ -1,4 +1,5 @@
 import sqlite3
+import time
 
 def create_db():
     conn = sqlite3.connect("users.db")
@@ -17,8 +18,22 @@ def add_user(name, age):
 def get_user_by_id(user_id):
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
-    query = f"SELECT * FROM users WHERE id = {user_id}"
-    c.execute(query)
+    query = "SELECT * FROM users WHERE id = ?"
+    c.execute(query, (user_id,))
     user = c.fetchone()
     conn.close()
     return user
+
+def retry_with_backoff(func, *args, **kwargs):
+    max_retries = 5
+    delay = 1  # Initial delay in seconds
+    for retry in range(max_retries):
+        try:
+            return func(*args, **kwargs)
+        except sqlite3.OperationalError as e:
+            if "too many connections" in str(e):
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
+            else:
+                raise e
+    raise Exception("Max retries exceeded")
